@@ -1,11 +1,16 @@
 import React, { useRef, useState } from 'react';
 import './ImageGenerator.css';
 import default_image from '../Assets/default_image.svg';
+import { InferenceClient } from '@huggingface/inference';
 
 const ImageGenerator = () => {
-    const [image_url, setImage_url] = useState("/");
+    const [imageURL, setImageURL] = useState("/");
     const inputRef = useRef(null);
     const [loading, setLoading] = useState(false);
+
+    const client = new InferenceClient({
+        token: 'YOUR_VALID_HF_API_KEY', // Replace with your valid Hugging Face API key
+    });
 
     const imageGenerator = async () => {
         const prompt = inputRef.current.value.trim();
@@ -17,47 +22,25 @@ const ImageGenerator = () => {
         setLoading(true);
 
         try {
-            const response = await fetch(
-                "https://api.openai.com/v1/images/generations",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: "Bearer sk-...", // Replace with your actual API key
-                    },
-                    body: JSON.stringify({
-                        prompt: prompt,
-                        n: 1,
-                        size: "512x512",
-                    }),
-                }
-            );
+            const response = await client.textToImage({
+                model: 'runwayml/stable-diffusion-v1-5', // Use a supported model
+                prompt: prompt,
+                parameters: {
+                    num_inference_steps: 50,
+                    guidance_scale: 7.5,
+                },
+            });
 
-            const data = await response.json();
-            console.log("API response:", data); // for debugging
-
-            if (data.error) {
-                console.error("OpenAI API error:", data.error);
-                alert("OpenAI Error: " + data.error.message);
-                setLoading(false);
-                return;
-            }
-
-            if (data && data.data && data.data.length > 0) {
-                setImage_url(data.data[0].url);
-            } else {
-                console.warn("No image data returned.");
-                alert("No image generated. Try again with a different prompt.");
-                setImage_url("/");
-            }
-
+            // Assuming response is a Blob (InferenceClient returns binary data)
+            const imageObjectURL = URL.createObjectURL(response);
+            setImageURL(imageObjectURL);
         } catch (error) {
             console.error("Image generation error:", error);
-            alert("Something went wrong. Please try again.");
-            setImage_url("/");
+            alert(`Error: ${error.message}. Please check your API key, model, or try again later.`);
+            setImageURL("/");
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     return (
@@ -66,7 +49,7 @@ const ImageGenerator = () => {
 
             <div className="img-loading">
                 <div className="image">
-                    <img src={image_url === "/" ? default_image : image_url} alt="AI Generated Result" />
+                    <img src={imageURL === "/" ? default_image : imageURL} alt="AI Generated Result" />
                 </div>
                 <div className="loading">
                     <div className={loading ? "loading-bar-full" : "loading-bar"}></div>
